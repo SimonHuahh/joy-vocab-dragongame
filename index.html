@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>乐学单词之飞龙过江</title>
+<style>
+  :root{
+    --sky1:#7ec8ff; --sky2:#c9ecff;
+    --river1:#2f80d8; --river2:#5fa8f0;
+    --ink:#22344a; --paper:#fff7ec;
+    --gold:#ffcf4d; --gold-d:#f0a500;
+    --green:#46c46a; --green-d:#2fa552;
+    --red:#ef5b5b; --red-d:#d63b3b;
+    --btn:#fffdf8; --btn-line:#e7d8bd;
+    --heart:#ff5470;
+    --shadow:0 6px 0 rgba(0,0,0,.12);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif;
+    background:#1b2c44;
+    color:var(--ink);
+    overflow:hidden;
+    overscroll-behavior:none;
+    touch-action:manipulation;
+  }
+  #app{
+    position:relative;
+    max-width:480px;
+    margin:0 auto;
+    height:100dvh;
+    height:100vh;
+    background:#bfe6ff;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    box-shadow:0 0 40px rgba(0,0,0,.4);
+  }
+
+  /* ---------- 状态栏 ---------- */
+  #topbar{
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 14px;
+    background:linear-gradient(180deg,#ffe9b8,#ffd87a);
+    border-bottom:3px solid #e7b54a;
+    z-index:5;
+  }
+  .lvl-tag{
+    font-weight:800;
+    font-size:15px;
+    color:#7a4d00;
+    background:#fff3d2;
+    border:2px solid #e7b54a;
+    border-radius:999px;
+    padding:4px 12px;
+    white-space:nowrap;
+  }
+  .hearts{display:flex;gap:3px;font-size:20px;line-height:1;}
+  .hearts .h{transition:transform .2s, opacity .3s;}
+  .hearts .h.lost{opacity:.22;transform:scale(.7);filter:grayscale(1);}
+  .progress{
+    font-weight:800;font-size:14px;color:#7a4d00;
+    background:#fff3d2;border:2px solid #e7b54a;border-radius:999px;
+    padding:4px 10px;white-space:nowrap;
+  }
+
+  /* ---------- 场景（约2/3）---------- */
+  #scene{
+    position:relative;
+    flex:1 1 auto;
+    min-height:0;
+  }
+  #sky{display:block;width:100%;height:100%;}
+  /* 飞行提示语 */
+  #flash{
+    position:absolute;top:12px;left:50%;transform:translateX(-50%);
+    background:rgba(255,255,255,.92);
+    border:3px solid #fff;
+    border-radius:14px;
+    padding:8px 16px;
+    font-weight:800;font-size:15px;
+    color:var(--ink);
+    box-shadow:var(--shadow);
+    opacity:0;pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    max-width:88%;text-align:center;
+  }
+  #flash.show{opacity:1;transform:translateX(-50%) translateY(4px);}
+  #flash.good{border-color:var(--green);color:var(--green-d);}
+  #flash.bad{border-color:var(--red);color:var(--red-d);}
+
+  /* ---------- 答题区（约1/3）---------- */
+  #quiz{
+    flex:0 0 auto;
+    background:linear-gradient(180deg,#fffdf8,#fbf2dd);
+    border-top:3px solid #e7d8bd;
+    padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+    z-index:5;
+  }
+  #wordcard{
+    text-align:center;
+    margin-bottom:10px;
+  }
+  #word{
+    font-size:clamp(28px,9vw,40px);
+    font-weight:800;
+    letter-spacing:.5px;
+    color:var(--ink);
+    line-height:1.1;
+  }
+  #wordsub{font-size:12px;color:#9a8a6c;margin-top:2px;font-weight:600;}
+  #options{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .opt{
+    appearance:none;border:none;cursor:pointer;
+    background:var(--btn);
+    border:2.5px solid var(--btn-line);
+    border-radius:16px;
+    padding:14px 10px;
+    min-height:56px;
+    font-size:16px;font-weight:700;
+    color:var(--ink);
+    box-shadow:0 4px 0 #e7d8bd;
+    transition:transform .08s, background .15s, border-color .15s, box-shadow .08s;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    line-height:1.25;
+  }
+  .opt:active{transform:translateY(3px);box-shadow:0 1px 0 #e7d8bd;}
+  .opt:disabled{cursor:default;}
+  .opt.correct{background:#e3f9e8;border-color:var(--green);color:var(--green-d);box-shadow:0 4px 0 var(--green-d);}
+  .opt.wrong{background:#fde6e6;border-color:var(--red);color:var(--red-d);box-shadow:0 4px 0 var(--red-d);}
+  .opt.correct::after{content:" ✓";font-weight:900;}
+  .opt.wrong::after{content:" ✗";font-weight:900;}
+
+  /* ---------- 覆盖层（开始/过关/失败/胜利）---------- */
+  .overlay{
+    position:absolute;inset:0;z-index:20;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:28px 24px;gap:14px;
+    background:linear-gradient(180deg,var(--sky1),var(--sky2));
+  }
+  .overlay.hide{display:none;}
+  .overlay canvas{filter:drop-shadow(0 6px 10px rgba(0,0,0,.18));}
+  .title{
+    font-size:clamp(26px,8vw,38px);font-weight:900;color:#fff;
+    text-shadow:0 3px 0 #d63b3b,0 5px 12px rgba(0,0,0,.25);
+    line-height:1.15;letter-spacing:1px;
+  }
+  .subtitle{font-size:16px;font-weight:700;color:#2c4a6e;}
+  .maker{
+    font-size:14px;font-weight:700;color:#fff;
+    background:rgba(34,52,74,.35);border-radius:999px;padding:5px 16px;
+  }
+  .msg{
+    font-size:clamp(17px,5vw,21px);font-weight:800;color:#22344a;
+    background:rgba(255,255,255,.85);border-radius:18px;padding:14px 18px;
+    max-width:340px;line-height:1.4;box-shadow:var(--shadow);
+  }
+  .stat{font-size:15px;font-weight:700;color:#2c4a6e;}
+  .bigbtn{
+    appearance:none;border:none;cursor:pointer;
+    font-size:20px;font-weight:900;color:#7a4d00;
+    background:linear-gradient(180deg,#ffe07a,var(--gold));
+    border:3px solid #fff;
+    border-radius:999px;
+    padding:15px 42px;
+    box-shadow:0 6px 0 var(--gold-d),0 10px 18px rgba(0,0,0,.2);
+    transition:transform .08s, box-shadow .08s;
+    margin-top:4px;
+  }
+  .bigbtn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--gold-d);}
+  .bigbtn.danger{background:linear-gradient(180deg,#ff8a8a,var(--red));color:#fff;box-shadow:0 6px 0 var(--red-d),0 10px 18px rgba(0,0,0,.2);}
+  .clouds-deco{position:absolute;font-size:40px;opacity:.85;animation:float 6s ease-in-out infinite;}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- 状态栏 -->
+  <div id="topbar">
+    <div class="lvl-tag" id="lvlTag">第 1 关</div>
+    <div class="hearts" id="hearts"></div>
+    <div class="progress" id="prog">1 / 10</div>
+  </div>
+
+  <!-- 场景 -->
+  <div id="scene">
+    <canvas id="sky"></canvas>
+    <div id="flash"></div>
+  </div>
+
+  <!-- 答题区 -->
+  <div id="quiz">
+    <div id="wordcard">
+      <div id="word">—</div>
+      <div id="wordsub">选择正确的中文释义</div>
+    </div>
+    <div id="options"></div>
+  </div>
+
+  <!-- 开始界面 -->
+  <div class="overlay" id="startScreen">
+    <div class="clouds-deco" style="top:14%;left:10%">☁️</div>
+    <div class="clouds-deco" style="top:22%;right:12%;animation-delay:1.5s">☁️</div>
+    <canvas id="startArt" width="220" height="170"></canvas>
+    <div class="title">乐学单词之<br>飞龙过江</div>
+    <div class="subtitle">骑上红龙，闯过五江，征服单词！</div>
+    <button class="bigbtn" id="startBtn">开 始 游 戏</button>
+    <div class="maker">制作者：Simon Guo</div>
+  </div>
+
+  <!-- 过关界面 -->
+  <div class="overlay hide" id="passScreen">
+    <canvas id="passArt" width="220" height="170"></canvas>
+    <div class="title" id="passTitle">过关啦！</div>
+    <div class="msg" id="passMsg"></div>
+    <div class="stat" id="passStat"></div>
+    <button class="bigbtn" id="nextBtn">下一关 →</button>
+  </div>
+
+  <!-- 失败界面 -->
+  <div class="overlay hide" id="overScreen">
+    <canvas id="overArt" width="220" height="170"></canvas>
+    <div class="title" style="text-shadow:0 3px 0 #2c4a6e,0 5px 12px rgba(0,0,0,.25)">飞龙坠江了…</div>
+    <div class="msg" id="overMsg">别灰心，再来一次一定可以！</div>
+    <div class="stat" id="overStat"></div>
+    <button class="bigbtn danger" id="retryBtn">重新开始</button>
+  </div>
+
+  <!-- 最终胜利界面 -->
+  <div class="overlay hide" id="winScreen">
+    <div class="clouds-deco" style="top:12%;left:8%">✨</div>
+    <div class="clouds-deco" style="top:18%;right:10%;animation-delay:1s">✨</div>
+    <canvas id="winArt" width="240" height="180"></canvas>
+    <div class="title">全 部 通 关！</div>
+    <div class="msg">恭喜你，成功完成所有关卡！<br>真的太厉害了！🎉</div>
+    <div class="stat" id="winStat"></div>
+    <button class="bigbtn" id="winBtn">再玩一次</button>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   乐学单词之飞龙过江  ·  by Simon Guo
+   单文件 · 无外部依赖 · Canvas 卡通绘制
+   ============================================================ */
+
+/* ---------------- 题库（5关 · 每关≥10题） ----------------
+   每题：[英文单词, 正确释义, 干扰1, 干扰2, 干扰3]
+   干扰项尽量同词性、相近领域，具迷惑性。 */
+const BANKS = [
+  /* 第1关 · 高中英语 · 3000词 */
+  [
+    ["brave",   "勇敢的", "害怕的", "聪明的", "懒惰的"],
+    ["invent",  "发明",   "模仿",   "购买",   "修理"],
+    ["polite",  "有礼貌的","粗鲁的", "安静的", "严格的"],
+    ["journey", "旅程",   "日记",   "期刊",   "工厂"],
+    ["decide",  "决定",   "隐藏",   "分开",   "否认"],
+    ["famous",  "著名的", "普通的", "危险的", "富有的"],
+    ["protect", "保护",   "攻击",   "抛弃",   "检查"],
+    ["honest",  "诚实的", "谦虚的", "自私的", "紧张的"],
+    ["develop", "发展",   "消失",   "包围",   "减少"],
+    ["courage", "勇气",   "愤怒",   "好奇",   "习惯"],
+    ["repair",  "修理",   "破坏",   "出售",   "借出"],
+  ],
+  /* 第2关 · 大学英语 · 5000词 */
+  [
+    ["abandon",     "放弃", "拥抱", "维持", "装饰"],
+    ["genuine",     "真正的", "虚假的", "慷慨的", "模糊的"],
+    ["reluctant",   "不情愿的", "渴望的", "自信的", "谨慎的"],
+    ["emphasize",   "强调", "忽视", "总结", "削弱"],
+    ["fragile",     "脆弱的", "坚固的", "灵活的", "沉重的"],
+    ["anticipate",  "预期", "回忆", "拒绝", "怀疑"],
+    ["tremendous",  "巨大的", "微小的", "普通的", "短暂的"],
+    ["conscious",   "有意识的", "无知的", "昏迷的", "笨拙的"],
+    ["accumulate",  "积累", "消耗", "分配", "释放"],
+    ["inevitable",  "不可避免的", "偶然的", "可选的", "罕见的"],
+    ["diverse",     "多样的", "单一的", "相似的", "稳定的"],
+  ],
+  /* 第3关 · 雅思6分 · 8000词 */
+  [
+    ["ambiguous",    "模棱两可的", "明确的", "透明的", "丰富的"],
+    ["deteriorate",  "恶化", "改善", "巩固", "维持"],
+    ["prevalent",    "普遍流行的", "罕见的", "短暂的", "隐蔽的"],
+    ["compelling",   "引人入胜的", "乏味的", "模糊的", "微弱的"],
+    ["scrutiny",     "仔细审查", "随意一瞥", "公开赞扬", "简要概述"],
+    ["resilient",    "有韧性的", "脆弱的", "僵硬的", "顺从的"],
+    ["notion",       "概念观念", "动作", "比例", "缺口"],
+    ["plausible",    "似乎合理的", "荒谬的", "确定的", "虚假的"],
+    ["mitigate",     "减轻缓和", "加剧", "引发", "延长"],
+    ["coherent",     "连贯的", "杂乱的", "简短的", "重复的"],
+    ["intricate",    "错综复杂的", "简单的", "粗糙的", "平凡的"],
+  ],
+  /* 第4关 · 雅思7.5分 · 10000词 */
+  [
+    ["ubiquitous",     "无处不在的", "稀有的", "短暂的", "隐藏的"],
+    ["meticulous",     "一丝不苟的", "草率的", "慷慨的", "急躁的"],
+    ["ephemeral",      "短暂易逝的", "永久的", "巨大的", "频繁的"],
+    ["tenacious",      "坚韧顽强的", "软弱的", "冷漠的", "短暂的"],
+    ["cumbersome",     "笨重累赘的", "轻便的", "优雅的", "简洁的"],
+    ["lucid",          "清晰易懂的", "晦涩的", "复杂的", "混乱的"],
+    ["paramount",      "至高无上的", "次要的", "平等的", "偶然的"],
+    ["inadvertently",  "无意地", "故意地", "频繁地", "谨慎地"],
+    ["austere",        "朴素严苛的", "奢华的", "温和的", "华丽的"],
+    ["discrepancy",    "差异不一致", "一致", "相似", "平衡"],
+    ["pragmatic",      "务实的", "理想化的", "鲁莽的", "感性的"],
+  ],
+  /* 第5关 · 雅思8.5分 · 12000词 */
+  [
+    ["perfunctory",    "敷衍草率的", "热忱的", "彻底的", "谨慎的"],
+    ["obfuscate",      "使模糊混淆", "阐明", "揭露", "简化"],
+    ["sycophant",      "谄媚奉承者", "批评者", "领导者", "隐士"],
+    ["quintessential", "典型完美的", "罕见的", "平庸的", "异常的"],
+    ["recalcitrant",   "顽抗不服的", "顺从的", "热情的", "冷静的"],
+    ["ostensible",     "表面上的", "真实的", "隐秘的", "明显的"],
+    ["magnanimous",    "宽宏大量的", "小气的", "残忍的", "胆怯的"],
+    ["inexorable",     "不可阻挡的", "可避免的", "温和的", "短暂的"],
+    ["perspicacious",  "有洞察力的", "愚钝的", "天真的", "固执的"],
+    ["surreptitious",  "偷偷摸摸的", "公开的", "诚实的", "大胆的"],
+    ["truculent",      "好斗凶狠的", "温顺的", "友善的", "胆小的"],
+  ],
+];
+
+const LEVEL_LABELS = [
+  "高中 · 3000词",
+  "大学 · 5000词",
+  "雅思6分 · 8000词",
+  "雅思7.5分 · 10000词",
+  "雅思8.5分 · 12000词",
+];
+
+const PASS_MSGS = [
+  "你真的太棒了！期待你接下来的表现！",
+  "稳得很！继续保持这股劲头！",
+  "厉害！难度越来越高你也越来越强！",
+  "顶尖水准！只差最后一江了！",
+  "封神操作！你已经站在词汇的巅峰！",
+];
+
+const Q_PER_LEVEL = 10;     // 每关题数
+const PASS_NEED = 8;        // 过关所需答对数
+const MAX_HEARTS = 3;       // 每关红心数
+
+/* ---------------- 游戏状态 ---------------- */
+let state = null;
+function newGameState(){
+  return { level:0, qIndex:0, questions:[], hearts:MAX_HEARTS, correct:0, wrong:0,
+           progress:0, locked:false };
+}
+
+/* ---------------- 工具 ---------------- */
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=(Math.random()*(i+1))|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+function buildQuestions(levelIdx){
+  const bank = shuffle(BANKS[levelIdx]).slice(0, Q_PER_LEVEL);
+  return bank.map(row=>{
+    const word = row[0], correct = row[1];
+    const opts = shuffle([row[1],row[2],row[3],row[4]]);
+    return { word, correct, options:opts, answer:opts.indexOf(correct) };
+  });
+}
+
+/* ======================================================================
+   场景绘制（Canvas）：蓝天白云 + 江 + 少年骑红龙
+   ====================================================================== */
+const sky = document.getElementById('sky');
+const sctx = sky.getContext('2d');
+let SW=0, SH=0, DPR=1;
+
+function resizeScene(){
+  const r = document.getElementById('scene').getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  SW = r.width; SH = r.height;
+  sky.width = Math.round(SW*DPR);
+  sky.height = Math.round(SH*DPR);
+  sky.style.width = SW+'px';
+  sky.style.height = SH+'px';
+  sctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resizeScene);
+
+// 云朵数据
+const clouds = [
+  {x:0.15,y:0.18,s:1.0,sp:0.012},
+  {x:0.55,y:0.10,s:0.7,sp:0.018},
+  {x:0.80,y:0.26,s:0.9,sp:0.009},
+  {x:0.35,y:0.32,s:0.6,sp:0.015},
+];
+
+let dragonX = 0;      // 当前龙的水平进度 0~1
+let targetX = 0;      // 目标进度
+let bobT = 0;         // 上下浮动相位
+let wingT = 0;        // 翅膀拍动相位
+let shakeT = 0;       // 答错抖动
+let crossed = false;  // 是否已抵达对岸（过关动画）
+
+function drawCloud(ctx,x,y,s){
+  ctx.save();
+  ctx.translate(x,y); ctx.scale(s,s);
+  ctx.fillStyle='rgba(255,255,255,.95)';
+  ctx.beginPath();
+  ctx.arc(0,0,18,0,7); ctx.arc(20,-6,22,0,7); ctx.arc(44,0,18,0,7);
+  ctx.arc(22,8,24,0,7);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 绘制少年+红龙（中心点 cx,cy；scale；flap 翅膀相位；smile 微笑）
+function drawDragon(ctx,cx,cy,scale,flap,smile){
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.scale(scale,scale);
+
+  const wing = Math.sin(flap)*0.5; // 翅膀角度
+
+  // 阴影/光晕略
+  // ----- 尾巴 -----
+  ctx.fillStyle='#e23b3b';
+  ctx.beginPath();
+  ctx.moveTo(-46,6);
+  ctx.quadraticCurveTo(-78,-2,-92,14);
+  ctx.quadraticCurveTo(-80,16,-70,12);
+  ctx.quadraticCurveTo(-58,18,-46,16);
+  ctx.closePath(); ctx.fill();
+  // 尾尖（菱形）
+  ctx.beginPath();
+  ctx.moveTo(-92,14); ctx.lineTo(-104,6); ctx.lineTo(-100,18); ctx.lineTo(-104,22); ctx.closePath();
+  ctx.fillStyle='#ffd24d'; ctx.fill();
+
+  // ----- 后翼 -----
+  ctx.save();
+  ctx.translate(-8,-6); ctx.rotate(-0.5 - wing);
+  ctx.fillStyle='#c92f2f';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.quadraticCurveTo(20,-44,52,-30);
+  ctx.quadraticCurveTo(40,-16,44,-2);
+  ctx.quadraticCurveTo(24,-6,0,0);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // ----- 身体 -----
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();
+  ctx.ellipse(-6,8,40,24,0,0,7);
+  ctx.fill();
+  // 肚皮
+  ctx.fillStyle='#ffe0a3';
+  ctx.beginPath();
+  ctx.ellipse(-6,18,30,12,0,0,7);
+  ctx.fill();
+
+  // ----- 脖子 + 头 -----
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();
+  ctx.moveTo(20,2);
+  ctx.quadraticCurveTo(46,-6,50,-26);
+  ctx.quadraticCurveTo(60,-30,66,-22);
+  ctx.quadraticCurveTo(40,8,28,18);
+  ctx.closePath(); ctx.fill();
+  // 头
+  ctx.beginPath();
+  ctx.ellipse(60,-30,20,17,0.1,0,7);
+  ctx.fill();
+  // 吻部
+  ctx.beginPath();
+  ctx.ellipse(74,-24,12,9,0.1,0,7);
+  ctx.fill();
+  // 鼻孔
+  ctx.fillStyle='#b81d1d';
+  ctx.beginPath(); ctx.arc(82,-26,1.6,0,7); ctx.fill();
+  // 犄角
+  ctx.fillStyle='#ffd24d';
+  ctx.beginPath(); ctx.moveTo(52,-44); ctx.lineTo(48,-58); ctx.lineTo(58,-46); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(62,-44); ctx.lineTo(64,-58); ctx.lineTo(70,-44); ctx.closePath(); ctx.fill();
+  // 眼睛
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(62,-32,5.5,0,7); ctx.fill();
+  ctx.fillStyle='#2a2a2a';
+  ctx.beginPath(); ctx.arc(63.5,-32,3,0,7); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(64.5,-33,1,0,7); ctx.fill();
+  // 嘴
+  ctx.strokeStyle='#b81d1d'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath();
+  if(smile){ ctx.moveTo(70,-18); ctx.quadraticCurveTo(78,-14,84,-19); }
+  else { ctx.moveTo(70,-18); ctx.lineTo(84,-19); }
+  ctx.stroke();
+  // 鬃毛
+  ctx.fillStyle='#ffd24d';
+  for(let i=0;i<4;i++){
+    ctx.beginPath();
+    const bx=44-i*7, by=-22+i*8;
+    ctx.moveTo(bx,by); ctx.lineTo(bx-8,by-6); ctx.lineTo(bx-2,by+4); ctx.closePath(); ctx.fill();
+  }
+
+  // ----- 少年（骑在背上）-----
+  ctx.save();
+  ctx.translate(-10,-14);
+  // 腿
+  ctx.strokeStyle='#3b6cd1'; ctx.lineWidth=6; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0,8); ctx.lineTo(8,22); ctx.stroke();
+  // 身体
+  ctx.fillStyle='#ffd24d';
+  ctx.beginPath(); ctx.roundRect(-9,-12,18,22,8); ctx.fill();
+  // 手臂（举起）
+  ctx.strokeStyle='#f2b27a'; ctx.lineWidth=5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(6,-6); ctx.lineTo(18,-18); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6,-4); ctx.lineTo(-12,-12); ctx.stroke();
+  // 头
+  ctx.fillStyle='#ffe0b8';
+  ctx.beginPath(); ctx.arc(0,-22,11,0,7); ctx.fill();
+  // 头发
+  ctx.fillStyle='#3a2a1a';
+  ctx.beginPath(); ctx.arc(0,-26,11,Math.PI,2*Math.PI); ctx.fill();
+  ctx.fillRect(-11,-26,22,5);
+  // 眼睛
+  ctx.fillStyle='#2a2a2a';
+  ctx.beginPath(); ctx.arc(-3.5,-22,1.6,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(3.5,-22,1.6,0,7); ctx.fill();
+  // 笑脸
+  ctx.strokeStyle='#c0392b'; ctx.lineWidth=1.8;
+  ctx.beginPath();
+  if(smile){ ctx.arc(0,-18,4,0.15*Math.PI,0.85*Math.PI); }
+  else { ctx.moveTo(-3,-17); ctx.lineTo(3,-17); }
+  ctx.stroke();
+  // 腮红
+  ctx.fillStyle='rgba(255,120,120,.5)';
+  ctx.beginPath(); ctx.arc(-6,-19,2.2,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(6,-19,2.2,0,7); ctx.fill();
+  ctx.restore();
+
+  // ----- 前翼（覆盖在前）-----
+  ctx.save();
+  ctx.translate(-2,-8); ctx.rotate(-0.7 - wing*1.1);
+  ctx.fillStyle='#ef4444';
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.quadraticCurveTo(26,-58,66,-40);
+  ctx.quadraticCurveTo(52,-22,56,-4);
+  ctx.quadraticCurveTo(30,-8,0,0);
+  ctx.closePath(); ctx.fill();
+  // 翼脉
+  ctx.strokeStyle='rgba(180,30,30,.5)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(8,-4); ctx.lineTo(46,-30); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(16,-2); ctx.lineTo(50,-18); ctx.stroke();
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawScene(ts){
+  if(!SW){ resizeScene(); }
+  const t = ts*0.001;
+  // 天空
+  const g = sctx.createLinearGradient(0,0,0,SH);
+  g.addColorStop(0,'#7ec8ff'); g.addColorStop(.6,'#bfe6ff'); g.addColorStop(1,'#dff3ff');
+  sctx.fillStyle=g; sctx.fillRect(0,0,SW,SH);
+
+  // 太阳
+  sctx.fillStyle='rgba(255,221,102,.95)';
+  sctx.beginPath(); sctx.arc(SW-44,42,24,0,7); sctx.fill();
+  sctx.fillStyle='rgba(255,221,102,.3)';
+  sctx.beginPath(); sctx.arc(SW-44,42,36,0,7); sctx.fill();
+
+  // 云
+  for(const c of clouds){
+    c.x += c.sp*0.004;
+    if(c.x>1.2) c.x=-0.25;
+    drawCloud(sctx, c.x*SW, c.y*SH*0.9+8, c.s*(SW/420));
+  }
+
+  // 江（占场景下方约 40%）
+  const riverTop = SH*0.62;
+  const rg = sctx.createLinearGradient(0,riverTop,0,SH);
+  rg.addColorStop(0,'#5fa8f0'); rg.addColorStop(1,'#2f6fd0');
+  sctx.fillStyle=rg; sctx.fillRect(0,riverTop,SW,SH-riverTop);
+  // 波纹
+  sctx.strokeStyle='rgba(255,255,255,.35)'; sctx.lineWidth=2;
+  for(let i=0;i<3;i++){
+    const yy = riverTop + 18 + i*((SH-riverTop)/3);
+    sctx.beginPath();
+    for(let x=0;x<=SW;x+=12){
+      const y = yy + Math.sin((x*0.05)+(t*1.5)+(i))*3;
+      x===0?sctx.moveTo(x,y):sctx.lineTo(x,y);
+    }
+    sctx.stroke();
+  }
+
+  // 两岸
+  const bankY = riverTop;
+  // 左岸（起点）
+  sctx.fillStyle='#7bc86b';
+  sctx.beginPath();
+  sctx.moveTo(0,bankY-2);
+  sctx.quadraticCurveTo(SW*0.10,bankY-6,SW*0.16,bankY+10);
+  sctx.lineTo(0,bankY+10); sctx.closePath(); sctx.fill();
+  sctx.fillStyle='#5fae50';
+  sctx.fillRect(0,bankY+8,SW*0.16,SH-bankY);
+  // 右岸（终点）
+  sctx.fillStyle='#7bc86b';
+  sctx.beginPath();
+  sctx.moveTo(SW,bankY-2);
+  sctx.quadraticCurveTo(SW*0.90,bankY-8,SW*0.84,bankY+10);
+  sctx.lineTo(SW,bankY+10); sctx.closePath(); sctx.fill();
+  sctx.fillStyle='#5fae50';
+  sctx.fillRect(SW*0.84,bankY+8,SW*0.16,SH-bankY);
+  // 终点旗
+  const fx=SW*0.93, fy=bankY-2;
+  sctx.strokeStyle='#7a5230'; sctx.lineWidth=3;
+  sctx.beginPath(); sctx.moveTo(fx,fy); sctx.lineTo(fx,fy-34); sctx.stroke();
+  sctx.fillStyle='#ef4444';
+  sctx.beginPath();
+  sctx.moveTo(fx,fy-34); sctx.lineTo(fx+22,fy-28);
+  sctx.lineTo(fx,fy-22); sctx.closePath(); sctx.fill();
+
+  // ---- 龙的位置 ----
+  // 平滑趋近目标
+  dragonX += (targetX - dragonX) * 0.12;
+  bobT += 0.05; wingT += 0.18;
+  const flyLeft = SW*0.16, flyRight = SW*0.84;
+  const baseX = flyLeft + (flyRight-flyLeft)*dragonX;
+  let baseY = bankY - 36 - Math.sin(bobT)*7;
+  let sx = 0;
+  if(shakeT>0){ sx = Math.sin(shakeT*40)*4; shakeT -= 0.05; }
+  const scl = Math.max(0.62, Math.min(1.0, SW/460));
+  drawDragon(sctx, baseX+sx, baseY, scl, wingT, crossed || state==null);
+
+  rafId = requestAnimationFrame(drawScene);
+}
+let rafId = null;
+
+/* ======================================================================
+   小图（开始/过关/失败/胜利界面里的卡通插画）
+   ====================================================================== */
+function paintMini(canvasId, mode){
+  const c = document.getElementById(canvasId);
+  if(!c) return;
+  const ctx = c.getContext('2d');
+  const w=c.width, h=c.height;
+  ctx.clearRect(0,0,w,h);
+  // 背景小江
+  ctx.fillStyle='#bfe6ff';
+  ctx.fillRect(0,h*0.6,w,h*0.4);
+  ctx.fillStyle='#7bc86b';
+  ctx.fillRect(0,h*0.58,w,6);
+  // 云
+  drawCloud(ctx,w*0.2,h*0.2,0.6); drawCloud(ctx,w*0.75,h*0.28,0.5);
+  // 龙
+  const smile = (mode!=='over');
+  ctx.save();
+  if(mode==='over'){ ctx.globalAlpha=0.9; }
+  drawDragon(ctx, w*0.5, mode==='over'? h*0.78 : h*0.5, mode==='win'?1.0:0.92, mode==='over'?2:0, smile);
+  ctx.restore();
+  if(mode==='over'){
+    // 落水水花
+    ctx.fillStyle='rgba(255,255,255,.8)';
+    for(let i=0;i<6;i++){
+      const a=i/6*Math.PI*2;
+      ctx.beginPath(); ctx.arc(w*0.5+Math.cos(a)*40, h*0.82+Math.sin(a)*8, 3,0,7); ctx.fill();
+    }
+  }
+}
+
+/* ======================================================================
+   音效（Web Audio）
+   ====================================================================== */
+let actx=null;
+function initAudio(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function beep(freqs, dur, type){
+  if(!actx) return;
+  let t = actx.currentTime;
+  freqs.forEach((f,i)=>{
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.type=type||'sine'; o.frequency.value=f;
+    o.connect(g); g.connect(actx.destination);
+    const st=t+i*dur*0.7;
+    g.gain.setValueAtTime(0.0001,st);
+    g.gain.exponentialRampToValueAtTime(0.25,st+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,st+dur);
+    o.start(st); o.stop(st+dur+0.02);
+  });
+}
+const sndGood = ()=>beep([523,784],0.16,'triangle');     // 上行清脆
+const sndBad  = ()=>beep([196,150],0.22,'sawtooth');     // 下行低沉
+const sndWin  = ()=>beep([523,659,784,1047],0.18,'triangle');
+const sndLose = ()=>beep([330,247,165],0.28,'sawtooth');
+
+/* ======================================================================
+   UI 渲染
+   ====================================================================== */
+const el = id=>document.getElementById(id);
+
+function renderHearts(){
+  const box = el('hearts'); box.innerHTML='';
+  for(let i=0;i<MAX_HEARTS;i++){
+    const s=document.createElement('span');
+    s.className='h'+(i>=state.hearts?' lost':'');
+    s.textContent='❤️';
+    box.appendChild(s);
+  }
+}
+
+function renderTop(){
+  el('lvlTag').textContent = '第 '+(state.level+1)+' 关';
+  el('prog').textContent = (state.qIndex+1)+' / '+Q_PER_LEVEL;
+  renderHearts();
+}
+
+function renderQuestion(){
+  const q = state.questions[state.qIndex];
+  el('word').textContent = q.word;
+  el('wordsub').textContent = LEVEL_LABELS[state.level];
+  const box = el('options'); box.innerHTML='';
+  q.options.forEach((opt,i)=>{
+    const b=document.createElement('button');
+    b.className='opt'; b.textContent=opt;
+    b.onclick=()=>answer(i,b);
+    box.appendChild(b);
+  });
+  state.locked=false;
+}
+
+function flash(text, good){
+  const f=el('flash');
+  f.textContent=text;
+  f.className='show '+(good?'good':'bad');
+  clearTimeout(f._t);
+  f._t=setTimeout(()=>{ f.className=''; }, good?900:1500);
+}
+
+/* ---------------- 答题逻辑 ---------------- */
+function answer(idx, btn){
+  if(state.locked) return;
+  state.locked=true;
+  const q = state.questions[state.qIndex];
+  const buttons = [...el('options').children];
+
+  if(idx===q.answer){
+    // 答对
+    btn.classList.add('correct');
+    state.correct++;
+    state.progress = Math.min(1, state.progress + 1/Q_PER_LEVEL);
+    targetX = state.progress;
+    sndGood();
+    flash('答对啦！飞龙向前一步 🐉', true);
+    buttons.forEach(b=>b.disabled=true);
+    setTimeout(nextStep, 850);
+  }else{
+    // 答错
+    btn.classList.add('wrong');
+    buttons[q.answer].classList.add('correct');
+    state.wrong++;
+    state.hearts--;
+    shakeT = 1;
+    renderHearts();
+    sndBad();
+    flash('答错了，正确答案：'+q.correct, false);
+    buttons.forEach(b=>b.disabled=true);
+    if(state.hearts<=0){
+      setTimeout(gameOver, 1100);
+    }else{
+      setTimeout(nextStep, 1300);
+    }
+  }
+}
+
+function nextStep(){
+  state.qIndex++;
+  if(state.qIndex>=Q_PER_LEVEL){
+    levelComplete();
+  }else{
+    renderTop();
+    renderQuestion();
+  }
+}
+
+/* ---------------- 关卡流程 ---------------- */
+function startLevel(levelIdx){
+  state.level=levelIdx;
+  state.qIndex=0;
+  state.hearts=MAX_HEARTS;
+  state.correct=0;
+  state.wrong=0;
+  state.progress=0;
+  state.questions=buildQuestions(levelIdx);
+  dragonX=0; targetX=0; crossed=false;
+  hideAllOverlays();
+  renderTop();
+  renderQuestion();
+}
+
+function levelComplete(){
+  const passed = state.correct>=PASS_NEED;
+  if(!passed){ gameOver(true); return; }
+  crossed=true; targetX=1;
+  if(state.level>=BANKS.length-1){
+    winGame();
+  }else{
+    sndWin();
+    paintMini('passArt','pass');
+    el('passTitle').textContent='第 '+(state.level+1)+' 关 · 过关！';
+    el('passMsg').textContent=PASS_MSGS[state.level];
+    el('passStat').textContent='本关答对 '+state.correct+' / '+Q_PER_LEVEL+' 题';
+    showOverlay('passScreen');
+  }
+}
+
+function gameOver(byScore){
+  sndLose();
+  crossed=false;
+  paintMini('overArt','over');
+  el('overMsg').textContent = byScore
+    ? '答对题数不足（需 '+PASS_NEED+' 题），飞龙没能撑到对岸。'
+    : '三颗红心都用光了，飞龙坠入江中…';
+  el('overStat').textContent='本关进度：第 '+(state.level+1)+' 关 · 答对 '+state.correct+' 题';
+  showOverlay('overScreen');
+}
+
+function winGame(){
+  sndWin();
+  paintMini('winArt','win');
+  el('winStat').textContent='你征服了全部 5 江，共 50 道单词题！';
+  showOverlay('winScreen');
+}
+
+/* ---------------- 覆盖层切换 ---------------- */
+function hideAllOverlays(){
+  ['startScreen','passScreen','overScreen','winScreen'].forEach(id=>el(id).classList.add('hide'));
+}
+function showOverlay(id){ hideAllOverlays(); el(id).classList.remove('hide'); }
+
+/* ======================================================================
+   事件绑定 & 启动
+   ====================================================================== */
+el('startBtn').onclick = ()=>{ initAudio(); state=newGameState(); startLevel(0); };
+el('nextBtn').onclick  = ()=>{ startLevel(state.level+1); };
+el('retryBtn').onclick = ()=>{ state=newGameState(); startLevel(0); };
+el('winBtn').onclick   = ()=>{ state=newGameState(); startLevel(0); };
+
+// 开始界面插画
+function paintStartArt(){ paintMini('startArt','start'); }
+
+window.addEventListener('load', ()=>{
+  resizeScene();
+  paintStartArt();
+  rafId = requestAnimationFrame(drawScene);
+});
+// 兜底：某些浏览器 load 已触发
+resizeScene();
+setTimeout(()=>{ paintStartArt(); if(!rafId) rafId=requestAnimationFrame(drawScene); }, 60);
+</script>
+</body>
+</html>
